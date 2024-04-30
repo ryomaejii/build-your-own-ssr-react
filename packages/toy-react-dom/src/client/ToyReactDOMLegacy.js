@@ -74,34 +74,57 @@ export function hydrate(element, container) {
   const nextChildren = Array.isArray(element) ? element : [element];
 
   nextChildren.forEach((nextChild, index) => {
+    // prevChildはnextChildの前回の状態を保持している
     const prevChild = prevChildren[index];
+
+    // nextChildに対応するprevChildが存在する場合
     if (prevChild) {
       if (nextChild.type === 'TEXT_ELEMENT') {
+        // text elementの場合、prevChildのtextContentを更新する
+        // textContentは、DOMのテキストノードの中身を取得するプロパティ
         prevChild.textContent = nextChild.props.nodeValue;
-      } else if (nextChild.type instanceof Function) {
+      }
+      // nextChildが関数コンポーネントの場合
+      else if (nextChild.type instanceof Function) {
+        // <App />のように渡されているので、typeは関数となる
         const component = nextChild.type(nextChild.props);
+
+        // renderを持っているのってどんな時 ?
+        // 例えば、<App />のように関数コンポーネントを定義した場合、
+        // renderを持っていないので、component.renderはundefinedとなる
+        // 一方、classコンポーネントの場合、renderを持っているので、component.renderは関数となる
         const child = component.render ? component.render() : component;
+        // 1つずつpropsを比較していく
         for (const prop in child.props) {
+          // childrenは無視する
           if (isChildren(prop)) {
             continue;
           }
           if (isStyle(prop)) {
+            // styleをprevChildに適用する
             const styles = Object.entries(child.props[prop]);
             styles.forEach(([key, value]) => {
               prevChild[prop][key] = value;
             });
           }
           if (isProperty(prop)) {
+            // propertyをprevChildに適用する
             prevChild[prop] = nextChild.props[prop];
           }
           if (isEvent(prop)) {
+            // eventをprevChildに適用する
             const eventType = prop.toLowerCase().substring(2);
             prevChild.addEventListener(eventType, nextChild.props[prop]);
           }
         }
+        // 子要素を再帰的に処理する
         hydrate(child.props.children, prevChild);
-      } else {
+      }
+      // nextChildがDOM要素の場合
+      else {
+        // 子要素を再帰的に処理する
         hydrate(nextChild.props.children, prevChild);
+        // 1つずつpropsを比較していく
         for (const prop in nextChild.props) {
           if (isChildren(prop)) {
             continue;
@@ -121,7 +144,11 @@ export function hydrate(element, container) {
           }
         }
       }
-    } else {
+    }
+    // nextChildに対応するprevChildが存在しない場合
+    else {
+      // nextChildをDOMに追加する
+      // この条件分岐より、クライアントとサーバーに差異が生じてた場合、クライアント側で差異を吸収する
       container.appendChild(createDom(nextChild));
     }
   });
